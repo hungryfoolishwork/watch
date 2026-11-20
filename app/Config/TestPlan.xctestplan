@@ -15,16 +15,16 @@
   "testTargets" : [
     {
       "target" : {
-        "containerPath" : "container:ProjectKit",
-        "identifier" : "ProjectKitTests",
-        "name" : "ProjectKitTests"
+        "containerPath" : "container:WatchKit",
+        "identifier" : "WatchKitTests",
+        "name" : "WatchKitTests"
       }
     },
     {
       "target" : {
-        "containerPath" : "container:ProjectCore",
-        "identifier" : "ProjectCoreTests",
-        "name" : "ProjectCoreTests"
+        "containerPath" : "container:WatchCore",
+        "identifier" : "WatchCoreTests",
+        "name" : "WatchCoreTests"
       }
     }
   ],

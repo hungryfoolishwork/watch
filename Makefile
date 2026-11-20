@@ -1,4 +1,4 @@
-NAME := Project
+NAME := Watch
 XCB := xcodebuild -project app/$(NAME).xcodeproj
 BUILD_DIR := .build/xcode
 CONFIG ?= Debug
