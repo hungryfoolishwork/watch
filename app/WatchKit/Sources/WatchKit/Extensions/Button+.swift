@@ -31,4 +31,12 @@ extension Button where Label == SwiftUI.Label<Text, Image> {
     public static func settings(_ title: String = "Settings", _ action: @escaping () -> Void) -> Button {
         Button(title, systemImage: "gear", action: action)
     }
+
+    public static func newChannel(_ title: String = "New Channel", _ action: @escaping () -> Void) -> Button {
+        Button(title, systemImage: "rectangle.badge.plus", action: action)
+    }
+
+    public static func newPlaylist(_ title: String = "New Playlist", _ action: @escaping () -> Void) -> Button {
+        Button(title, systemImage: "rectangle.stack.badge.plus", action: action)
+    }
 }

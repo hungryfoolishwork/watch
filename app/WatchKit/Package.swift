@@ -19,6 +19,7 @@ let package = Package(
             name: "WatchKit",
             dependencies: [
                 .product(name: "WatchProtocol", package: "WatchCore"),
+                .product(name: "WatchCore", package: "WatchCore"),
             ],
             resources: [
                 .process("Assets.xcassets"),

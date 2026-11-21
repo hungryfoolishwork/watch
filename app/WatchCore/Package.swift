@@ -27,6 +27,9 @@ let package = Package(
             name: "WatchCoreTests",
             dependencies: [
                 "WatchCore",
+            ],
+            resources: [
+                .copy("Fixtures"),
             ]
         ),
     ]
