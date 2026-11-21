@@ -11,7 +11,6 @@ struct MainApp: App {
         Window("Watch", id: "main") {
             AppRoot()
                 .frame(minWidth: 720, minHeight: 480)
-                .preferredColorScheme(.dark)
         }
         .environment(state)
         .defaultSize(width: 1260, height: 880)
