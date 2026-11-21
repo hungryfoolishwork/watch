@@ -64,7 +64,7 @@ public struct ClipEditor: View {
 
     private func handleClose() {
         model?.close()
-        if state.listening == nil, let wasListening, state.showing.contains(wasListening) {
+        if state.listening == nil, let wasListening, state.streams[wasListening] != nil {
             state.listen(wasListening)
         }
     }
@@ -147,7 +147,7 @@ private struct ClipEditorContent: View {
     private var preview: some View {
         ZStack {
             Color.black
-            PlayerLayer(player: model.player, gravity: .resizeAspect)
+            PlayerLayer(layer: model.layer, gravity: .resizeAspect)
             switch model.phase {
             case .capturing:
                 ProgressView()

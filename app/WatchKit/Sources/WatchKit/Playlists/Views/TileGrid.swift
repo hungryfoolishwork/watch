@@ -234,15 +234,19 @@ private struct TileMenu: View {
     }
 
     var body: some View {
-        ForEach(members) { channel in
-            Toggle(channel.displayName, isOn: Binding(
-                get: { current == channel.id },
-                set: { _ in handlePick(channel) }))
+        if let current, let channel = state.session.channel(current) {
+            Button("Remove “\(channel.displayName)” from Playlist") { handleRemove(current) }
+            Divider()
+            Button("Clip…", systemImage: "scissors") { handleClip(current) }
+                .disabled(state.streams[current]?.url == nil)
+            if state.pip == current {
+                Button("Bring Back from Picture in Picture", systemImage: "pip.exit") { handlePip(current) }
+            } else {
+                Button("Play in Picture in Picture", systemImage: "pip.enter") { handlePip(current) }
+                    .disabled(!state.canPip(current))
+            }
+            Divider()
         }
-        if members.isEmpty {
-            Text("No channels in this playlist")
-        }
-        Divider()
         Menu("Add to Playlist") {
             ForEach(others) { channel in
                 Button(channel.displayName) { handlePick(channel) }
@@ -252,11 +256,14 @@ private struct TileMenu: View {
             }
             Button("New Channel…") { handleChannelAdd() }
         }
-        if let current, let channel = state.session.channel(current) {
-            Button("Remove “\(channel.displayName)” from Playlist") { handleRemove(current) }
-            Divider()
-            Button("Clip…", systemImage: "scissors") { handleClip(current) }
-                .disabled(state.streams[current]?.url == nil)
+        Divider()
+        ForEach(members) { channel in
+            Toggle(channel.displayName, isOn: Binding(
+                get: { current == channel.id },
+                set: { _ in handlePick(channel) }))
+        }
+        if members.isEmpty {
+            Text("No channels in this playlist")
         }
     }
 
@@ -276,5 +283,9 @@ private struct TileMenu: View {
 
     private func handleClip(_ channel: String) {
         openWindow(id: ClipEditor.windowID, value: channel)
+    }
+
+    private func handlePip(_ channel: String) {
+        state.pipToggle(channel)
     }
 }

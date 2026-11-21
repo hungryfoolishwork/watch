@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import Foundation
 import WatchCore
 import WatchProtocol
@@ -13,8 +14,32 @@ public final class LiveStream: Identifiable {
         case failed(String)
     }
 
+    /// What Picture in Picture has to say about this stream.
+    public enum PipEvent: Sendable {
+        /// The picture is on its way out to the floating window.
+        case began
+        /// The floating window is gone, or never managed to open.
+        case ended
+        /// The floating window's return button was pressed: put this
+        /// stream's tile back on screen for the picture to land on.
+        case restore
+        case failed(String)
+    }
+
     public let channel: Channel
     public let player = AVPlayer()
+
+    /// The layer the stream's tile shows. It belongs to the stream, not to
+    /// the tile's view, because Picture in Picture is tied to a layer and
+    /// carries on after the tile has left the screen.
+    public let layer = AVPlayerLayer()
+
+    /// Whether this stream is playing in the Picture in Picture window.
+    public private(set) var isInPip = false
+
+    /// Called as Picture in Picture starts, stops, fails, or asks for its
+    /// tile back.
+    public var onPip: (PipEvent) -> Void = { _ in }
 
     public private(set) var status: Status = .loading
 
@@ -37,6 +62,8 @@ public final class LiveStream: Identifiable {
     private var refreshTask: Task<Void, Never>?
     private var consecutiveFailures = 0
     private var isStopped = false
+    private var pip: AVPictureInPictureController?
+    private var pipDelegate: PipDelegate?
 
     /// YouTube's manifests expire after ~6 h; re-resolve well before that.
     private let refreshInterval: TimeInterval = 4 * 60 * 60
@@ -54,6 +81,8 @@ public final class LiveStream: Identifiable {
         player.isMuted = true
         player.automaticallyWaitsToMinimizeStalling = true
         player.preventsDisplaySleepDuringVideoPlayback = true
+        layer.player = player
+        pipPrepare()
         load()
     }
 
@@ -81,6 +110,9 @@ public final class LiveStream: Identifiable {
     /// dropping the stream.
     public func stop() {
         isStopped = true
+        pipStop()
+        pip = nil
+        pipDelegate = nil
         refreshTask?.cancel()
         refreshTask = nil
         stopObserving()
@@ -175,5 +207,81 @@ public final class LiveStream: Identifiable {
         statusObservation = nil
         notifications.forEach(NotificationCenter.default.removeObserver)
         notifications.removeAll()
+    }
+
+    // MARK: - Picture in Picture
+
+    /// Whether the picture can go out to the floating window right now.
+    public var canPip: Bool {
+        pip != nil && status == .playing
+    }
+
+    /// Sends the picture out to the system's floating window. The system
+    /// shows one at a time, so this takes the place of any other.
+    public func pipStart() {
+        guard let pip, !pip.isPictureInPictureActive else { return }
+        pip.startPictureInPicture()
+    }
+
+    /// Brings the picture back from the floating window.
+    public func pipStop() {
+        guard let pip, pip.isPictureInPictureActive else { return }
+        pip.stopPictureInPicture()
+    }
+
+    /// The controller is made up front: it takes a moment after it's made
+    /// before it will agree to start.
+    private func pipPrepare() {
+        guard AVPictureInPictureController.isPictureInPictureSupported(),
+              let controller = AVPictureInPictureController(playerLayer: layer)
+        else { return }
+        let delegate = PipDelegate { [weak self] event in
+            self?.pipChanged(event)
+        }
+        controller.delegate = delegate
+        pip = controller
+        pipDelegate = delegate
+    }
+
+    private func pipChanged(_ event: PipEvent) {
+        switch event {
+        case .began: isInPip = true
+        case .ended, .failed: isInPip = false
+        case .restore: break
+        }
+        onPip(event)
+    }
+}
+
+/// AVKit reports to an Objective-C delegate; this passes what it says along.
+@MainActor
+private final class PipDelegate: NSObject, @preconcurrency AVPictureInPictureControllerDelegate {
+    private let report: (LiveStream.PipEvent) -> Void
+
+    init(report: @escaping (LiveStream.PipEvent) -> Void) {
+        self.report = report
+    }
+
+    func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
+        report(.began)
+    }
+
+    func pictureInPictureController(_ controller: AVPictureInPictureController, failedToStartPictureInPictureWithError error: any Error) {
+        report(.failed(error.localizedDescription))
+    }
+
+    func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        report(.ended)
+    }
+
+    func pictureInPictureController(
+        _ controller: AVPictureInPictureController,
+        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+    ) {
+        report(.restore)
+        // The picture flies back to wherever the layer is on screen, so give
+        // the tile a moment to be put there first.
+        nonisolated(unsafe) let done = completionHandler
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { done(true) }
     }
 }

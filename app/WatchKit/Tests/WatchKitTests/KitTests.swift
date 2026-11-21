@@ -11,6 +11,7 @@ import Testing
             .channel("rumble:RTNews"),
             .clip("TBPN, 2-14 PM.mp4"),
             .clipCreate("SkyNews"),
+            .pip("kick:tbpn"),
             .channelAdd,
             .settings,
         ]
@@ -94,6 +95,74 @@ import Testing
         state.select(.playlist("news"))
         #expect(state.zoomed == nil)
         #expect(state.listening == nil || state.showing.contains(state.listening!))
+    }
+
+    @Test func pictureInPictureKeepsPlayingAfterItsTileLeaves() {
+        let state = state()
+        let tiles = state.showing
+        state.listen(tiles[1])
+        state.pipBegan(tiles[1])
+
+        state.select(.channel(tiles[0]))
+        #expect(state.pip == tiles[1])
+        #expect(state.listening == tiles[1])
+
+        // It trades the sound like any tile, on screen or not.
+        state.listen(tiles[0])
+        #expect(state.listening == tiles[0])
+        state.listen(tiles[1])
+        #expect(state.listening == tiles[1])
+
+        state.pipEnded(tiles[1])
+        #expect(state.pip == nil)
+        #expect(state.listening == nil)
+    }
+
+    @Test func pictureInPictureReturnsToWhereItLeftFrom() {
+        let state = state()
+        let tiles = state.showing
+        state.pipBegan(tiles[1])
+        state.select(.channel(tiles[0]))
+        state.pipRestore(tiles[1])
+        #expect(state.router.selection == .playlist("tech"))
+
+        // With that playlist gone, the channel is shown on its own.
+        state.select(.channel(tiles[0]))
+        state.playlistDelete("tech")
+        state.pipRestore(tiles[1])
+        #expect(state.router.selection == .channel(tiles[1]))
+    }
+
+    @Test func pictureInPictureReturnsToATileThatIsNotHidden() {
+        let state = state()
+        let tiles = state.showing
+        state.pipBegan(tiles[1])
+        state.zoom(tiles[0])
+        state.pipRestore(tiles[1])
+        #expect(state.zoomed == nil)
+        #expect(state.router.selection == .playlist("tech"))
+    }
+
+    @Test func listeningToPictureInPictureLeavesTheZoomAlone() {
+        let state = state()
+        state.select(.playlist("news"))
+        let away = state.showing[6]
+        state.pipBegan(away)
+        state.select(.playlist("tech"))
+        #expect(!state.showing.contains(away))
+
+        state.zoom(state.showing[0])
+        state.listen(away)
+        #expect(state.zoomed == state.showing[0])
+        #expect(state.listening == away)
+    }
+
+    @Test func deletingAChannelEndsItsPictureInPicture() {
+        let state = state()
+        let channel = state.showing[1]
+        state.pipBegan(channel)
+        state.channelDelete(channel)
+        #expect(state.pip == nil)
     }
 
     @Test func swappingAndPlacingTiles() {

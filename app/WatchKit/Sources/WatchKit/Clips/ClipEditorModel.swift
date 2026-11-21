@@ -28,6 +28,8 @@ final class ClipEditorModel {
 
     let channel: Channel
     let player = AVPlayer()
+    /// The layer the preview shows.
+    let layer = AVPlayerLayer()
     var name: String
 
     private(set) var phase: Phase = .capturing
@@ -59,6 +61,7 @@ final class ClipEditorModel {
         // no fun in a file name.
         let time = now.formatted(date: .omitted, time: .shortened).replacingOccurrences(of: "\u{202F}", with: " ")
         self.name = "\(channel.displayName), \(time)"
+        layer.player = player
     }
 
     // MARK: - Capturing

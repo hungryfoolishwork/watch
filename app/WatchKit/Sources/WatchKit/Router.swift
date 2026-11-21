@@ -7,6 +7,8 @@ public enum Route: Identifiable, Hashable, Codable, Sendable {
     case channel(String)
     /// Opens the clip editor on a channel that's playing.
     case clipCreate(String)
+    /// Sends a playing channel out to Picture in Picture, or brings it back.
+    case pip(String)
     case channelAdd
     case settings
 
@@ -16,6 +18,7 @@ public enum Route: Identifiable, Hashable, Codable, Sendable {
         case .clip: "clip"
         case .channel: "channel"
         case .clipCreate: "clip-create"
+        case .pip: "pip"
         case .channelAdd: "channel-add"
         case .settings: "settings"
         }
@@ -23,7 +26,7 @@ public enum Route: Identifiable, Hashable, Codable, Sendable {
 
     private var subject: String? {
         switch self {
-        case .playlist(let id), .clip(let id), .channel(let id), .clipCreate(let id): id
+        case .playlist(let id), .clip(let id), .channel(let id), .clipCreate(let id), .pip(let id): id
         case .channelAdd, .settings: nil
         }
     }
@@ -51,6 +54,7 @@ public enum Route: Identifiable, Hashable, Codable, Sendable {
         case ("clip", false): self = .clip(subject)
         case ("channel", false): self = .channel(subject)
         case ("clip-create", false): self = .clipCreate(subject)
+        case ("pip", false): self = .pip(subject)
         case ("channel-add", true): self = .channelAdd
         case ("settings", true): self = .settings
         default: return nil

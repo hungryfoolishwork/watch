@@ -22,11 +22,15 @@ struct TileView: View {
         state.listening == channel.id
     }
 
+    private var isInPip: Bool {
+        state.pip == channel.id
+    }
+
     var body: some View {
         ZStack {
             Color.black
             if let stream {
-                PlayerLayer(player: stream.player, gravity: fills ? .resizeAspectFill : .resizeAspect)
+                PlayerLayer(layer: stream.layer, gravity: fills ? .resizeAspectFill : .resizeAspect)
                 TileStatus(status: stream.status)
             }
         }
@@ -50,6 +54,12 @@ struct TileView: View {
                 if isHovering, stream?.url != nil {
                     Button("Clip", systemImage: "scissors") { handleClip() }
                         .help("Clip the last two minutes")
+                        .transition(.opacity)
+                }
+                if isHovering, isInPip || state.canPip(channel.id) {
+                    Button("Picture in Picture", systemImage: isInPip ? "pip.exit" : "pip.enter") { handlePip() }
+                        .labelStyle(.iconOnly)
+                        .help(isInPip ? "Bring back from Picture in Picture" : "Play in Picture in Picture")
                         .transition(.opacity)
                 }
                 // A muted tile always says so. The one with the sound has its
@@ -77,6 +87,10 @@ struct TileView: View {
 
     private func handleClip() {
         openWindow(id: ClipEditor.windowID, value: channel.id)
+    }
+
+    private func handlePip() {
+        state.pipToggle(channel.id)
     }
 }
 

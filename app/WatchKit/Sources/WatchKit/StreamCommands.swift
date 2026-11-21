@@ -4,7 +4,7 @@ import WatchProtocol
 /// The menus Watch adds: New Playlist and Add Channel under File, and the
 /// Stream menu.
 ///
-/// The Stream menu's single-key shortcuts (1–9, M, R, C, Esc) are only
+/// The Stream menu's single-key shortcuts (0–9, M, R, C, P, Esc) are only
 /// enabled while the main window is in front showing tiles, so they don't
 /// swallow typing anywhere else.
 public struct StreamCommands: Commands {
@@ -57,6 +57,9 @@ public struct StreamCommands: Commands {
                     .keyboardShortcut(KeyEquivalent(Character("\(position + 1)")), modifiers: [])
                     .disabled(!keys || position >= (state.playlist?.grid.tiles ?? 0))
             }
+            Button("Listen to Picture in Picture") { state.listen(state.pip) }
+                .keyboardShortcut("0", modifiers: [])
+                .disabled(!keys || state.pip == nil)
             Divider()
             Button("Mute All") { state.listen(nil) }
                 .keyboardShortcut("m", modifiers: [])
@@ -68,7 +71,22 @@ public struct StreamCommands: Commands {
             Button("Clip Playing Tile…") { handleClip() }
                 .keyboardShortcut("c", modifiers: [])
                 .disabled(!keys || state.listening.flatMap { state.streams[$0]?.url } == nil)
+            if state.pip == nil {
+                Button("Play in Picture in Picture") { state.pipToggle() }
+                    .keyboardShortcut("p", modifiers: [])
+                    .disabled(!keys || !canPip)
+            } else {
+                Button("Bring Back from Picture in Picture") { state.pipToggle() }
+                    .keyboardShortcut("p", modifiers: [])
+                    .disabled(!keys)
+            }
         }
+    }
+
+    /// Whether the tile that's playing, or failing that the first one, can
+    /// go out to Picture in Picture.
+    private var canPip: Bool {
+        (state.listening ?? state.showing.first).map(state.canPip) ?? false
     }
 
     private func handleResize(_ grid: GridSize) {

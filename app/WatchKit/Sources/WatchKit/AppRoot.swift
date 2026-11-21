@@ -43,6 +43,7 @@ public struct AppRoot: View {
         } message: {
             Text(state.error ?? "")
         }
+        .background(alignment: .bottomTrailing) { pipAnchor }
         .focusedSceneValue(\.streamKeys, streamKeys)
         .onOpenURL { url in
             handleOpen(url)
@@ -52,6 +53,19 @@ public struct AppRoot: View {
             state.reload()
         }
         #endif
+    }
+
+    /// Picture in Picture can only be brought back while its layer is in a
+    /// window. When the channel's tile isn't on screen, its layer is kept
+    /// here instead, out of sight behind everything else.
+    @ViewBuilder
+    private var pipAnchor: some View {
+        if let pip = state.pip, !state.showing.contains(pip), let stream = state.streams[pip] {
+            PlayerLayer(layer: stream.layer)
+                .frame(width: 2, height: 2)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
@@ -123,6 +137,8 @@ public struct AppRoot: View {
             state.select(.channel(id))
         case .clipCreate(let channel) where state.session.channel(channel) != nil:
             openWindow(id: ClipEditor.windowID, value: channel)
+        case .pip(let channel):
+            state.pipToggle(channel)
         case .channelAdd:
             state.router.present(.channelAdd)
         case .settings:

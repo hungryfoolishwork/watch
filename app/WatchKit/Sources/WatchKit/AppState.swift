@@ -11,8 +11,9 @@ public final class AppState {
     public let session: any WatchProtocol::Session
 
     /// The streams that are running, by channel id. Only channels on screen
-    /// have one, and a channel keeps its stream when it moves to another tile
-    /// or the selection changes to something else that shows it.
+    /// have one, plus the one in Picture in Picture. A channel keeps its
+    /// stream when it moves to another tile or the selection changes to
+    /// something else that shows it.
     public private(set) var streams: [String: LiveStream] = [:]
 
     /// The channel with sound. Everything else is muted.
@@ -20,6 +21,14 @@ public final class AppState {
 
     /// The channel zoomed to fill the grid. The tiles behind it are paused.
     public private(set) var zoomed: String?
+
+    /// The channel in the Picture in Picture window. It keeps playing
+    /// whatever the main window goes on to show.
+    public private(set) var pip: String?
+
+    /// What was selected when the channel went out to Picture in Picture,
+    /// and so where its return button leads.
+    private var pipOrigin: Route?
 
     /// Whether tiles sit apart with rounded corners or edge to edge.
     public var showsPadding: Bool {
@@ -90,7 +99,7 @@ public final class AppState {
         case .playlist(let id): session.playlist(id) != nil
         case .clip(let id): session.clip(id) != nil
         case .channel(let id): session.channel(id) != nil
-        case .clipCreate, .channelAdd, .settings: false
+        case .clipCreate, .pip, .channelAdd, .settings: false
         }
     }
 
@@ -111,24 +120,32 @@ public final class AppState {
 
     /// Starts streams for channels that came on screen, stops the ones that
     /// left, and puts mute and pause in step with `listening` and `zoomed`.
+    /// The channel in Picture in Picture counts as playing wherever it is.
     private func sync() {
         let showing = showing
-        for (id, stream) in streams where !showing.contains(id) {
+        if let pip, session.channel(pip) == nil { pipClear() }
+        let playing = showing + [pip].compactMap { $0 }.filter { !showing.contains($0) }
+
+        for (id, stream) in streams where !playing.contains(id) {
             stream.stop()
             streams[id] = nil
         }
         if playsStreams {
             for id in showing where streams[id] == nil {
                 guard let channel = session.channel(id) else { continue }
-                streams[id] = LiveStream(channel: channel)
+                let stream = LiveStream(channel: channel)
+                stream.onPip = { [weak self] event in
+                    self?.pipChanged(id, event)
+                }
+                streams[id] = stream
             }
         }
-        if let listening, !showing.contains(listening) { self.listening = nil }
+        if let listening, !playing.contains(listening) { self.listening = nil }
         if let zoomed, !showing.contains(zoomed) { self.zoomed = nil }
 
         for (id, stream) in streams {
             stream.isMuted = id != listening
-            stream.setActive(zoomed == nil || zoomed == id)
+            stream.setActive(zoomed == nil || zoomed == id || pip == id)
         }
     }
 
@@ -136,7 +153,7 @@ public final class AppState {
     /// a tile hidden behind the zoomed one brings it forward instead, so the
     /// number keys flip channels while zoomed.
     public func listen(_ channel: String?) {
-        if let channel, zoomed != nil, zoomed != channel {
+        if let channel, zoomed != nil, zoomed != channel, showing.contains(channel) {
             zoomed = channel
         }
         listening = channel
@@ -179,6 +196,76 @@ public final class AppState {
     /// Finds every stream on screen again, as when a channel has just gone live.
     public func streamsReload() {
         streams.values.forEach { $0.load() }
+    }
+
+    // MARK: - Picture in Picture
+
+    /// Whether a channel's picture can go out to the floating window now.
+    public func canPip(_ channel: String) -> Bool {
+        streams[channel]?.canPip == true
+    }
+
+    /// Sends a channel out to Picture in Picture, or brings it back if it's
+    /// already there. With no channel named it's the one in Picture in
+    /// Picture, or else the one that's playing (or the first tile). The
+    /// system shows one floating window, so a second channel replaces the
+    /// first.
+    public func pipToggle(_ channel: String? = nil) {
+        if let pip, channel == nil || channel == pip {
+            streams[pip]?.pipStop()
+        } else if let target = channel ?? listening ?? showing.first, canPip(target) {
+            streams[target]?.pipStart()
+        }
+    }
+
+    /// A stream's picture has left for the floating window.
+    func pipBegan(_ channel: String) {
+        pip = channel
+        pipOrigin = router.selection
+        sync()
+    }
+
+    /// The floating window has closed. If its channel isn't on screen any
+    /// more, that's the end of its stream.
+    func pipEnded(_ channel: String) {
+        guard pip == channel else { return }
+        pipClear()
+        sync()
+    }
+
+    /// The floating window's return button: show the channel's tile again,
+    /// where it was when it left if that's still possible.
+    func pipRestore(_ channel: String) {
+        guard pip == channel else { return }
+        if !showing.contains(channel), let origin = pipOrigin, exists(origin) {
+            select(origin)
+        }
+        if !showing.contains(channel) {
+            select(.channel(channel))
+        }
+        // No good landing on a tile that's hidden behind a zoomed one.
+        if zoomed != nil, zoomed != channel {
+            zoom(nil)
+        }
+    }
+
+    private func pipChanged(_ channel: String, _ event: LiveStream.PipEvent) {
+        switch event {
+        case .began:
+            pipBegan(channel)
+        case .ended:
+            pipEnded(channel)
+        case .restore:
+            pipRestore(channel)
+        case .failed(let message):
+            pipEnded(channel)
+            error = message
+        }
+    }
+
+    private func pipClear() {
+        pip = nil
+        pipOrigin = nil
     }
 
     // MARK: - Channels
@@ -277,7 +364,7 @@ public final class AppState {
         case .playlist(let id): renameText = session.playlist(id)?.name ?? ""
         case .clip(let id): renameText = session.clip(id)?.name ?? ""
         case .channel(let id): renameText = session.channel(id)?.name ?? ""
-        case .clipCreate, .channelAdd, .settings: return
+        case .clipCreate, .pip, .channelAdd, .settings: return
         }
         renaming = route
     }
@@ -301,7 +388,7 @@ public final class AppState {
             }
         case .channel(let id):
             session.channelRename(id, name: name)
-        case .clipCreate, .channelAdd, .settings:
+        case .clipCreate, .pip, .channelAdd, .settings:
             break
         }
     }
