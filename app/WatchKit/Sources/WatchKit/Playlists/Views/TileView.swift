@@ -52,16 +52,22 @@ struct TileView: View {
                         .help("Clip the last two minutes")
                         .transition(.opacity)
                 }
-                Button(isListening ? "Mute" : "Listen", systemImage: isListening ? "speaker.wave.2" : "speaker.slash") {
-                    handleListen()
+                // A muted tile always says so. The one with the sound has its
+                // ring, so its button waits for the pointer.
+                if !isListening || isHovering {
+                    Button(isListening ? "Mute" : "Listen", systemImage: isListening ? "speaker.wave.2" : "speaker.slash") {
+                        handleListen()
+                    }
+                    .labelStyle(.iconOnly)
+                    .help(isListening ? "Mute" : "Listen to \(channel.displayName)")
+                    .transition(.opacity)
                 }
-                .labelStyle(.iconOnly)
-                .help(isListening ? "Mute" : "Listen to \(channel.displayName)")
             }
             .buttonStyle(TileButtonStyle())
             .padding(12)
         }
         .animation(.easeOut(duration: 0.15), value: isHovering)
+        .animation(.easeOut(duration: 0.15), value: isListening)
         .onHover { isHovering = $0 }
     }
 
