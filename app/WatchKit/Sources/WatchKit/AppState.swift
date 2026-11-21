@@ -30,6 +30,17 @@ public final class AppState {
     /// and so where its return button leads.
     private var pipOrigin: Route?
 
+    /// Whether the main window is open. While it's closed nothing plays but
+    /// the channel in Picture in Picture.
+    public private(set) var isWindowOpen = true
+
+    /// Goes up each time something needs the main window back after it's
+    /// been closed. The app opens the window when this changes.
+    public private(set) var windowRequests = 0
+
+    /// Who had the sound when the window closed, to give it back.
+    private var listeningWhenClosed: String?
+
     /// Whether tiles sit apart with rounded corners or edge to edge.
     public var showsPadding: Bool {
         didSet { UserDefaults.standard.set(showsPadding, forKey: Keys.showsPadding) }
@@ -122,7 +133,7 @@ public final class AppState {
     /// left, and puts mute and pause in step with `listening` and `zoomed`.
     /// The channel in Picture in Picture counts as playing wherever it is.
     private func sync() {
-        let showing = showing
+        let showing = isWindowOpen ? showing : []
         if let pip, session.channel(pip) == nil { pipClear() }
         let playing = showing + [pip].compactMap { $0 }.filter { !showing.contains($0) }
 
@@ -141,7 +152,8 @@ public final class AppState {
             }
         }
         if let listening, !playing.contains(listening) { self.listening = nil }
-        if let zoomed, !showing.contains(zoomed) { self.zoomed = nil }
+        // A closed window keeps its zoom for when it's opened again.
+        if let zoomed, !self.showing.contains(zoomed) { self.zoomed = nil }
 
         for (id, stream) in streams {
             stream.isMuted = id != listening
@@ -198,6 +210,29 @@ public final class AppState {
         streams.values.forEach { $0.load() }
     }
 
+    // MARK: - Window
+
+    /// The main window has closed: stop everything it was showing. Only the
+    /// channel in Picture in Picture carries on.
+    public func windowClosed() {
+        guard isWindowOpen else { return }
+        listeningWhenClosed = listening
+        isWindowOpen = false
+        sync()
+    }
+
+    /// The main window is back: start its streams again, and give the sound
+    /// back to whoever had it.
+    public func windowOpened() {
+        guard !isWindowOpen else { return }
+        isWindowOpen = true
+        sync()
+        if listening == nil, let channel = listeningWhenClosed, showing.contains(channel) {
+            listen(channel)
+        }
+        listeningWhenClosed = nil
+    }
+
     // MARK: - Picture in Picture
 
     /// Whether a channel's picture can go out to the floating window now.
@@ -237,6 +272,9 @@ public final class AppState {
     /// where it was when it left if that's still possible.
     func pipRestore(_ channel: String) {
         guard pip == channel else { return }
+        if !isWindowOpen {
+            windowRequests += 1
+        }
         if !showing.contains(channel), let origin = pipOrigin, exists(origin) {
             select(origin)
         }

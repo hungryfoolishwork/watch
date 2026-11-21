@@ -45,6 +45,12 @@ public struct AppRoot: View {
         }
         .background(alignment: .bottomTrailing) { pipAnchor }
         .focusedSceneValue(\.streamKeys, streamKeys)
+        .onAppear {
+            state.windowOpened()
+        }
+        .onDisappear {
+            state.windowClosed()
+        }
         .onOpenURL { url in
             handleOpen(url)
         }

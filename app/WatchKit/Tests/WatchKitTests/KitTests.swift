@@ -165,6 +165,36 @@ import Testing
         #expect(state.pip == nil)
     }
 
+    @Test func closingTheWindowLeavesOnlyPictureInPicture() {
+        let state = state()
+        let tiles = state.showing
+        state.listen(tiles[0])
+        state.pipBegan(tiles[1])
+
+        state.windowClosed()
+        #expect(state.listening == nil)
+        #expect(state.pip == tiles[1])
+
+        // The return button asks for the window, and the selection stays put.
+        state.pipRestore(tiles[1])
+        #expect(state.windowRequests == 1)
+        #expect(state.router.selection == .playlist("tech"))
+
+        state.windowOpened()
+        #expect(state.listening == tiles[0])
+    }
+
+    @Test func aClosedWindowKeepsPictureInPicturesSound() {
+        let state = state()
+        let tiles = state.showing
+        state.listen(tiles[1])
+        state.pipBegan(tiles[1])
+        state.windowClosed()
+        #expect(state.listening == tiles[1])
+        state.windowOpened()
+        #expect(state.listening == tiles[1])
+    }
+
     @Test func swappingAndPlacingTiles() {
         let state = state()
         let tiles = state.showing

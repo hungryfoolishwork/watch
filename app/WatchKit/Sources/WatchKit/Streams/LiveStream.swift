@@ -223,10 +223,26 @@ public final class LiveStream: Identifiable {
         pip.startPictureInPicture()
     }
 
-    /// Brings the picture back from the floating window.
+    /// Brings the picture back from the floating window. The system only
+    /// does this while the layer is in a window, so if the tile is still on
+    /// its way to the screen this waits a moment for it.
     public func pipStop() {
         guard let pip, pip.isPictureInPictureActive else { return }
-        pip.stopPictureInPicture()
+        guard layer.superlayer == nil, !isStopped else {
+            pip.stopPictureInPicture()
+            return
+        }
+        Task { [weak self] in
+            await self?.layerShown()
+            self?.pip?.stopPictureInPicture()
+        }
+    }
+
+    /// Waits, briefly, for the layer to be put in a view.
+    private func layerShown() async {
+        for _ in 0..<40 where layer.superlayer == nil {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
     }
 
     /// The controller is made up front: it takes a moment after it's made
@@ -237,6 +253,11 @@ public final class LiveStream: Identifiable {
         else { return }
         let delegate = PipDelegate { [weak self] event in
             self?.pipChanged(event)
+        } shown: { [weak self] in
+            // The picture flies back to wherever the layer is on screen, so
+            // give its tile a moment to be put there first.
+            try? await Task.sleep(for: .milliseconds(200))
+            await self?.layerShown()
         }
         controller.delegate = delegate
         pip = controller
@@ -257,9 +278,13 @@ public final class LiveStream: Identifiable {
 @MainActor
 private final class PipDelegate: NSObject, @preconcurrency AVPictureInPictureControllerDelegate {
     private let report: (LiveStream.PipEvent) -> Void
+    private let shown: () async -> Void
 
-    init(report: @escaping (LiveStream.PipEvent) -> Void) {
+    /// `report` hears each event. `shown` returns once the stream's tile is
+    /// back on screen, or isn't going to be.
+    init(report: @escaping (LiveStream.PipEvent) -> Void, shown: @escaping () async -> Void) {
         self.report = report
+        self.shown = shown
     }
 
     func pictureInPictureControllerWillStartPictureInPicture(_ controller: AVPictureInPictureController) {
@@ -279,9 +304,10 @@ private final class PipDelegate: NSObject, @preconcurrency AVPictureInPictureCon
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
     ) {
         report(.restore)
-        // The picture flies back to wherever the layer is on screen, so give
-        // the tile a moment to be put there first.
         nonisolated(unsafe) let done = completionHandler
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { done(true) }
+        Task {
+            await shown()
+            done(true)
+        }
     }
 }

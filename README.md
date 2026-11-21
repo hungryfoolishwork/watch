@@ -41,6 +41,7 @@ Going from 3×3 to 2×2 hides five tiles but remembers what was on them.
 - Double-click a tile, or press the zoom button in the toolbar, to make it fill the grid. Double-click again or press Esc to go back. Tiles hidden behind a zoomed one are paused and jump to live when they return. While zoomed, the number keys flip between channels.
 - The first toolbar button switches between tiles spaced apart and tiles edge to edge (⇧⌘P).
 - Hover over a tile and press the Picture in Picture button (or right-click the tile, or press `P` for the tile you're listening to) to float it over your other apps. It keeps playing whatever you go on to do in Watch: switch playlists, zoom another tile, look at a clip. Its return button takes you back to the playlist it came from. macOS shows one floating window at a time, so sending out a second channel brings the first one home. The floating window has no volume control: it has the sound when its channel does, and `0` gives it the sound from anywhere.
+- Closing the main window stops every stream except the one in Picture in Picture, so a floating feed can be all that's running. Opening the window again (from the Dock, the Window menu, or the floating window's return button) starts them back up.
 - `R` finds every stream again, which helps when a channel has just gone live. Streams also refresh themselves every few hours and after a playback failure, backing off if a site starts refusing requests.
 
 ## Clips

@@ -14,6 +14,10 @@ struct MainApp: App {
         }
         .environment(state)
         .defaultSize(width: 1260, height: 880)
+        // Picture in Picture's return button needs somewhere to return to.
+        .onChange(of: state.windowRequests) {
+            openWindow(id: "main")
+        }
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button.settings {
