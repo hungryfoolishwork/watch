@@ -6,6 +6,8 @@ Streams are played natively with AVPlayer: no web views and no re-encoding. YouT
 
 This is a rewrite of an earlier single-window version. The Mac app works. The iOS target builds and shares the code, but nothing has been designed for it yet.
 
+<img src="screenshots/screenshot.png">
+
 ## Run
 
     make run        # debug build, then launch
